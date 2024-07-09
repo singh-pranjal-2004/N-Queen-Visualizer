@@ -1,10 +1,9 @@
-// script.js
-
-const N = 5;
+let N = 5;
 let board = Array.from({ length: N }, () => Array(N).fill(0));
 let solutions = [];
 let isVisualizing = false;
-const visualizationDelay = 100; // in milliseconds
+let visualizationDelay = 100; // Initial delay in milliseconds
+let stopVisualization = false;
 
 function createBoard() {
     const boardElement = document.getElementById('board');
@@ -22,15 +21,28 @@ function createBoard() {
     }
 }
 
-function placeQueen(row, col, isPlacing) {
+function placeQueen(row, col, action) {
     const cell = document.getElementById(`cell-${row}-${col}`);
-    if (isPlacing) {
-        const queen = document.createElement('img');
-        queen.src = 'queen.png';
-        queen.classList.add('queen');
-        cell.appendChild(queen);
-    } else {
-        cell.innerHTML = '';
+    switch (action) {
+        case 'checking':
+            cell.style.backgroundColor = 'red';
+            break;
+        case 'placing':
+            cell.style.backgroundColor = 'goldenrod';
+            const queen = document.createElement('img');
+            queen.src = 'queen.png';
+            queen.classList.add('queen');
+            cell.appendChild(queen);
+            break;
+        case 'removing':
+            cell.style.backgroundColor = '';
+            cell.innerHTML = '';
+            cell.classList.add((row + col) % 2 === 0 ? 'white' : 'black');
+            break;
+        case 'safe':
+            cell.style.backgroundColor = '';
+            cell.classList.add((row + col) % 2 === 0 ? 'white' : 'black');
+            break;
     }
 }
 
@@ -51,6 +63,8 @@ function isSafe(board, row, col) {
 }
 
 async function solveNQueensUtil(board, col) {
+    if (stopVisualization) return;
+
     if (col >= N) {
         const solution = board.map(row => row.slice());
         solutions.push(solution);
@@ -59,20 +73,22 @@ async function solveNQueensUtil(board, col) {
     }
 
     for (let i = 0; i < N; i++) {
+        placeQueen(i, col, 'checking');
+        await new Promise(resolve => setTimeout(resolve, visualizationDelay));
+
         if (isSafe(board, i, col)) {
             board[i][col] = 1;
-            if (isVisualizing) {
-                placeQueen(i, col, true);
-                await new Promise(resolve => setTimeout(resolve, visualizationDelay));
-            }
+            placeQueen(i, col, 'placing');
+            await new Promise(resolve => setTimeout(resolve, visualizationDelay));
 
             await solveNQueensUtil(board, col + 1);
 
             board[i][col] = 0;
-            if (isVisualizing) {
-                placeQueen(i, col, false);
-                await new Promise(resolve => setTimeout(resolve, visualizationDelay));
-            }
+            placeQueen(i, col, 'removing');
+            await new Promise(resolve => setTimeout(resolve, visualizationDelay));
+        } else {
+            placeQueen(i, col, 'safe');
+            await new Promise(resolve => setTimeout(resolve, visualizationDelay));
         }
     }
 }
@@ -101,20 +117,47 @@ function displaySolution(solution) {
     solutionsElement.appendChild(solutionBoard);
 }
 
-function startVisualization() {
+async function startVisualization() {
+    stopVisualization = false;
     solutions = [];
+    N = parseInt(document.getElementById('num-queens').value);
+    visualizationDelay = 1000 - parseInt(document.getElementById('speed').value); // Inverted speed
     board = Array.from({ length: N }, () => Array(N).fill(0));
     createBoard();
     document.getElementById('solutions').innerHTML = '';
     isVisualizing = true;
-    solveNQueensUtil(board, 0).then(() => {
-        isVisualizing = false;
-        if (solutions.length > 0) {
-            alert(`Found ${solutions.length} solutions`);
-        } else {
-            alert('No solution found');
-        }
-    });
+    await solveNQueensUtil(board, 0);
+    isVisualizing = false;
+    if (solutions.length > 0) {
+        alert(`Found ${solutions.length} solutions`);
+    } else {
+        alert('No solution found');
+    }
 }
+
+function resetBoard() {
+    stopVisualization = true;
+    solutions = [];
+    N = parseInt(document.getElementById('num-queens').value);
+    board = Array.from({ length: N }, () => Array(N).fill(0));
+    createBoard();
+    document.getElementById('solutions').innerHTML = '';
+}
+
+document.getElementById('num-queens').addEventListener('input', () => {
+    resetBoard();
+});
+
+document.getElementById('dark-mode-toggle').addEventListener('click', () => {
+    document.body.classList.toggle('light-mode');
+});
+
+// Real-time speed controller
+document.getElementById('speed').addEventListener('input', () => {
+    visualizationDelay = 1000 - parseInt(document.getElementById('speed').value); // Update delay based on speed input
+});
+
+// Set default to dark mode
+document.body.classList.add('dark-mode');
 
 createBoard();
